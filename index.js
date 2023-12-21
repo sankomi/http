@@ -26,15 +26,57 @@ server.on("request", (req, res) => {
 
 			res.writeHead(200);
 
-			let write = messages.map(string => `dragon: ${string}`).join("\n");
-			res.write("dragons!\n\n" + write);
+			res.write(say(messages));
 			return res.end();
+		} else if (req.method === "POST") {
+			let body = "";
+			let messages = ["post!"];
+			req.on("data", data => body += data);
+			req.on("end", () => {
+				try {
+					let json = JSON.parse(body);
+					let presents = json.presents;
+
+					if (typeof presents === "number" && presents > 0) {
+						res.setHeader("content-type", "text/plain");
+						res.writeHead(200);
+
+						if (presents === 1) {
+							messages.push("present! thank you!");
+						} else {
+							messages.push("presents! thank you!");
+						}
+						res.write(say(messages));
+						res.end();
+					} else {
+						res.setHeader("content-type", "text/plain");
+						res.writeHead(400, "no presents");
+
+						messages.push("no presents?");
+						res.write(say(messages));
+						res.end();
+					}
+				} catch (err) {
+					res.setHeader("content-type", "text/plain");
+					res.writeHead(400, "what is this?");
+
+					messages.push("what is this?");
+					res.write(say(messages));
+					res.end();
+				}
+			});
+			return;
 		}
 	}
 	res.writeHead(404, "no dragons here", {"content-type": "text/plain"});
 	res.write("404 no dragons here");
 	res.end();
 });
+
+function say(messages) {
+	let write = messages.map(string => `dragon: ${string}`).join("\n");
+	return "dragons!\n\n" + write;
+}
 
 function parseCookie(cookie) {
 	if (!cookie) return {};
