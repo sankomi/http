@@ -3,6 +3,9 @@ const url = require("url");
 const port = process.env.PORT || 3000;
 const server = http.createServer();
 
+let cookiesGiven = 0;
+let presentsReceived = 0;
+
 server.on("request", (req, res) => {
 	const {pathname, query} = url.parse(req.url, true);
 	const cookies = parseCookie(req.headers.cookie);
@@ -17,6 +20,7 @@ server.on("request", (req, res) => {
 				if (cookies.cookie) {
 					messages.push("you have a cookie already..");
 				} else {
+					cookiesGiven++;
 					messages.push("here is a dragon cookie!");
 					res.setHeader("set-cookie", "cookie=dragonCookie;max-age=10");
 				}
@@ -41,6 +45,7 @@ server.on("request", (req, res) => {
 						res.setHeader("content-type", "text/plain");
 						res.writeHead(200);
 
+						presentsReceived += presents;
 						if (presents === 1) {
 							messages.push("present! thank you!");
 						} else {
@@ -66,6 +71,33 @@ server.on("request", (req, res) => {
 				}
 			});
 			return;
+		}
+	} else if (pathname === "/stats") {
+		if (req.method === "GET") {
+			let data = {cookiesGiven, presentsReceived};
+			let contentType = null;
+			let body = null;
+
+			if ("csv" in query) {
+				contentType = "text/csv";
+				res.setHeader("content-disposition", "attachment;filename=stats.csv");
+
+				let array = [["stat", "value"], ...Object.entries(data)];
+				array = array.map(kv => {
+					let key = "\"" + String(kv[0]).replaceAll("\"", "\"\"") + "\"";
+					let value = "\"" + String(kv[1]).replaceAll("\"", "\"\"") + "\"";
+					return key + "," + value;
+				});
+				body = array.join("\n");
+			} else {
+				contentType = "application/json";
+				body = JSON.stringify(data);
+			}
+
+			res.setHeader("content-type", contentType);
+			res.writeHead(200);
+			res.write(body);
+			return res.end();
 		}
 	}
 	res.writeHead(404, "no dragons here", {"content-type": "text/plain"});
