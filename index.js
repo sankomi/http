@@ -10,6 +10,48 @@ let cookiesGiven = 0;
 let presentsReceived = 0;
 
 
+// viewer
+
+const fs = require("fs").promises;
+const path = require("path");
+
+class Viewer {
+
+	constructor(templatePath, extension = ".html") {
+		this.templatePath = templatePath;
+		this.extension = extension;
+	}
+
+	getFilePath(name) {
+		return path.join(__dirname, this.templatePath, name) + this.extension;
+	}
+
+	async render(name, data) {
+		let filePath = this.getFilePath(name);
+		return await fs.readFile(filePath);
+	}
+
+}
+
+class SimpleViewer extends Viewer {
+
+	constructor(templatePath) {
+		super(templatePath);
+	}
+
+	async render(name, data) {
+		let filePath = this.getFilePath(name);
+		let html = await fs.readFile(filePath, "utf8");
+		html = html.replaceAll("{{title}}", data.title);
+		html = html.replaceAll("{{content}}", data.content.replaceAll(/\r?\n/g, "<br>"));
+		return html;
+	}
+
+}
+
+const viewer = new SimpleViewer("views");
+
+
 // router object
 
 let router = {
@@ -36,6 +78,11 @@ server.on("request", (req, res) => {
 	const {pathname, query} = url.parse(req.url, true);
 	req.query = query;
 	req.cookies = parseCookie(req.headers.cookie);
+	res.render = async (name, data) => {
+		res.setHeader("content-type", "text/html");
+		res.write(await viewer.render(name, data));
+		res.end();
+	};
 
 	let callback = router.callbacks.get(pathname);
 	if (!callback) {
@@ -59,6 +106,7 @@ server.on("request", (req, res) => {
 
 router.get("/", (req, res) => {
 	res.setHeader("content-type", "text/plain");
+	res.statusCode = 200;
 
 	let messages = [];
 	if ("cookie" in req.query) {
@@ -74,10 +122,13 @@ router.get("/", (req, res) => {
 		messages.push("hi!");
 	}
 
-	res.writeHead(200);
-
-	res.write(say(messages));
-	return res.end();
+	if ("html" in req.query) {
+		res.render("page", sayData(messages));
+	} else {
+		res.writeHead(200);
+		res.write(say(messages));
+		res.end();
+	}
 });
 
 router.post("/", (req, res) => {
@@ -90,8 +141,7 @@ router.post("/", (req, res) => {
 			let presents = json.presents;
 
 			if (typeof presents === "number" && presents > 0) {
-				res.setHeader("content-type", "text/plain");
-				res.writeHead(200);
+				res.statusCode = 200;
 
 				presentsReceived += presents;
 				if (presents === 1) {
@@ -99,23 +149,39 @@ router.post("/", (req, res) => {
 				} else {
 					messages.push("presents! thank you!");
 				}
-				res.write(say(messages));
-				res.end();
+
+				if ("html" in req.query) {
+					res.render("page", sayData(messages));
+				} else {
+					res.setHeader("content-type", "text/plain");
+					res.write(say(messages));
+					res.end();
+				}
+			} else {
+				res.statusCode = 400;
+				res.statusMessage = "no presents?";
+				messages.push("no presents?");
+
+				if ("html" in req.query) {
+					res.render("page", sayData(messages));
+				} else {
+					res.setHeader("content-type", "text/plain");
+					res.write(say(messages));
+					res.end();
+				}
+			}
+		} catch (err) {
+			res.statusCode = 400;
+			res.statusMessage = "what is this?";
+			messages.push("what is this?");
+
+			if ("html" in req.query) {
+				res.render("page", sayData(messages));
 			} else {
 				res.setHeader("content-type", "text/plain");
-				res.writeHead(400, "no presents");
-
-				messages.push("no presents?");
 				res.write(say(messages));
 				res.end();
 			}
-		} catch (err) {
-			res.setHeader("content-type", "text/plain");
-			res.writeHead(400, "what is this?");
-
-			messages.push("what is this?");
-			res.write(say(messages));
-			res.end();
 		}
 	});
 	return;
@@ -148,12 +214,23 @@ router.get("/stats", (req, res) => {
 	return res.end();
 });
 
+router.get("/html", async (req, res) => {
+	return res.render("page", {title: "title", content: "content"});
+});
+
 
 // utility functions
 
 function say(messages) {
 	let write = messages.map(string => `dragon: ${string}`).join("\n");
 	return "dragons!\n\n" + write;
+}
+
+function sayData(messages) {
+	return {
+		title: "dragons!",
+		content: messages.map(string => `dragon: ${string}`).join("\n"),
+	};
 }
 
 function parseCookie(cookie) {
