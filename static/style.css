@@ -1,0 +1,13 @@
+* {
+	box-sizing: border-box;
+}
+
+html {
+	font-family: monospace;
+}
+
+body {
+	max-width: 80rem;
+	padding: 0 1rem;
+	margin: 0 auto;
+}

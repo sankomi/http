@@ -72,9 +72,38 @@ let router = {
 };
 
 
+// static files
+
+const CONTENT_TYPES = Object.freeze({
+	".txt": "text/plain",
+	".html": "text/html",
+	".css": "text/css",
+	".js": "text/javascript",
+});
+
+async function getFile(pathname) {
+	let pathObject = path.parse(pathname);
+	let filePath = path.join(__dirname, "static", path.format(pathObject));
+	let contentType = CONTENT_TYPES[pathObject.ext] || "text/plain";
+
+	let result = await fs.readFile(filePath, "utf8")
+		.then(file => ({code: 200, contentType, file}))
+		.catch(err => {
+			switch (err.code) {
+				case "ENOENT":
+				case "EISDIR":
+					return {code: 404, contentType, file: null};
+				default:
+					return {code: 500, contentType, file: null};
+			}
+		});
+	return result;
+}
+
+
 // process requests
 
-server.on("request", (req, res) => {
+server.on("request", async (req, res) => {
 	const {pathname, query} = url.parse(req.url, true);
 	req.query = query;
 	req.cookies = parseCookie(req.headers.cookie);
@@ -83,6 +112,21 @@ server.on("request", (req, res) => {
 		res.write(await viewer.render(name, data));
 		res.end();
 	};
+
+	if (req.method === "GET") {
+		let {code, contentType, file} = await getFile(pathname);
+		if (code === 200) {
+			res.setHeader("conent-type", contentType);
+			res.writeHead(200);
+			res.write(file);
+			return res.end();
+		} else if (code === 500) {
+			res.setHeader("content-type", "text/plain");
+			res.writeHead(500, "something went wrong..");
+			res.write("500 something went wrong..");
+			return res.end();
+		}
+	}
 
 	let callback = router.callbacks.get(pathname);
 	if (!callback) {
