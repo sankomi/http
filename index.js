@@ -57,16 +57,34 @@ const viewer = new SimpleViewer("views");
 let router = {
 	callbacks: new Map(),
 	get(pathname, callback) {
-		this.addCallback("GET", pathname, callback);
+		this.setCallback("GET", pathname, callback);
 	},
 	post(pathname, callback) {
-		this.addCallback("POST", pathname, callback)
+		this.setCallback("POST", pathname, callback)
 	},
-	addCallback(method, pathname, callback) {
+	setCallback(method, pathname, callback) {
 		if (this.callbacks.has(pathname)) {
 			this.callbacks.get(pathname)[method] = callback;
 		} else {
 			this.callbacks.set(pathname, {[method]: callback});
+		}
+	},
+	getCallback(pathname, method) {
+		let callbacks;
+		if (pathname.endsWith("/")) {
+			callbacks = this.callbacks.get(pathname) || this.callbacks.get(pathname.slice(0, -1));
+		} else {
+			callbacks = this.callbacks.get(pathname) || this.callbacks.get(pathname + "/");
+		}
+		if (!callbacks) {
+			return {code: 404, callback: null};
+		}
+
+		let callback = callbacks[method];
+		if (callback) {
+			return {code: 200, callback};
+		} else {
+			return {code: 405, callback: null};
 		}
 	},
 };
@@ -75,23 +93,31 @@ let router = {
 // static files
 
 const CONTENT_TYPES = Object.freeze({
+	"other": "application/octet-stream",
 	".txt": "text/plain",
 	".html": "text/html",
 	".css": "text/css",
 	".js": "text/javascript",
+	".jpg": "image/jpeg",
+	".png": "image/png",
 });
 
 async function getFile(pathname) {
+	if (pathname.endsWith("/")) {
+		pathname += "index.html";
+	}
+
 	let pathObject = path.parse(pathname);
 	let filePath = path.join(__dirname, "static", path.format(pathObject));
-	let contentType = CONTENT_TYPES[pathObject.ext] || "text/plain";
+	let contentType = CONTENT_TYPES[pathObject.ext.toLowerCase()] || CONTENT_TYPES.other;
 
-	let result = await fs.readFile(filePath, "utf8")
+	let result = await fs.readFile(filePath)
 		.then(file => ({code: 200, contentType, file}))
-		.catch(err => {
+		.catch(async err => {
 			switch (err.code) {
-				case "ENOENT":
 				case "EISDIR":
+					return await getFile(pathname + "/");
+				case "ENOENT":
 					return {code: 404, contentType, file: null};
 				default:
 					return {code: 500, contentType, file: null};
@@ -113,6 +139,11 @@ server.on("request", async (req, res) => {
 		res.end();
 	};
 
+	let {code, callback} = router.getCallback(pathname, req.method);
+	if (code === 200) {
+		return callback(req, res);
+	}
+
 	if (req.method === "GET") {
 		let {code, contentType, file} = await getFile(pathname);
 		if (code === 200) {
@@ -128,21 +159,15 @@ server.on("request", async (req, res) => {
 		}
 	}
 
-	let callback = router.callbacks.get(pathname);
-	if (!callback) {
+	if (code === 404) {
 		res.writeHead(404, "no dragons here", {"content-type": "text/plain"});
 		res.write("404 no dragons here");
 		return res.end();
-	}
-
-	let methodCallback = callback[req.method];
-	if (!methodCallback) {
-		res.writeHead(404, "method not allowed", {"content-type": "text/plain"});
+	} else if (code === 405) {
+		res.writeHead(405, "method not allowed", {"content-type": "text/plain"});
 		res.write("405 dragons here but method not allowed");
 		return res.end();
 	}
-
-	methodCallback(req, res);
 });
 
 
