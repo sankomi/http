@@ -11,6 +11,9 @@ let presentsReceived = 0;
 // set routes
 
 server.get("/", (req, res) => {
+	let viewCount = req.session.viewCount || 0;
+	req.session.viewCount = ++viewCount;
+
 	res.setHeader("content-type", "text/plain");
 	res.statusCode = 200;
 
@@ -94,7 +97,8 @@ server.post("/", (req, res) => {
 });
 
 server.get("/stats", (req, res) => {
-	let data = {cookiesGiven, presentsReceived};
+	let viewCount = req.session.viewCount || 0;
+	let data = {cookiesGiven, presentsReceived, viewCount};
 	let contentType = null;
 	let body = null;
 

@@ -120,6 +120,34 @@ async function getFile(pathname) {
 }
 
 
+// session
+
+const {randomUUID} = require("crypto");
+
+const sessions = new Map();
+
+function createSession(sessionId) {
+	sessionId = sessionId || randomUUID();
+	let sessionData = {};
+	while (sessions.has(sessionId)) {
+		sessionId = randomUUID();
+	}
+
+	sessions.set(sessionId, sessionData);
+	return {sessionId, sessionData};
+}
+
+function getSession(sessionId) {
+	let sessionData = sessions.get(sessionId);
+
+	if (sessionData) {
+		return {sessionId, sessionData};
+	} else {
+		return createSession(sessionId);
+	}
+}
+
+
 // process requests
 
 server.on("request", async (req, res) => {
@@ -131,6 +159,11 @@ server.on("request", async (req, res) => {
 		res.write(await viewer.render(name, data));
 		res.end();
 	};
+
+	let {sessionId, sessionData} = getSession(req.cookies.session);
+	req.sessionId = sessionId;
+	req.session = sessionData;
+	res.setHeader("set-cookie", `session=${sessionId};max-age=3600`);
 
 	let {code, callback} = router.getCallback(pathname, req.method);
 	if (code === 200) {
