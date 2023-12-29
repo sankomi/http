@@ -126,8 +126,8 @@ const {randomUUID} = require("crypto");
 
 const sessions = new Map();
 
-function createSession(sessionId) {
-	sessionId = sessionId || randomUUID();
+function createSession() {
+	let sessionId = randomUUID();
 	let sessionData = {};
 	while (sessions.has(sessionId)) {
 		sessionId = randomUUID();
@@ -143,7 +143,7 @@ function getSession(sessionId) {
 	if (sessionData) {
 		return {sessionId, sessionData};
 	} else {
-		return createSession(sessionId);
+		return createSession();
 	}
 }
 
