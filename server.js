@@ -154,11 +154,18 @@ server.on("request", async (req, res) => {
 	const {pathname, query} = url.parse(req.url, true);
 	req.query = query;
 	req.cookies = parseCookie(req.headers.cookie);
+
 	res.render = async (name, data) => {
 		res.setHeader("content-type", "text/html");
 		res.write(await viewer.render(name, data));
 		res.end();
 	};
+
+	res.redirect = (location, permanent = false) => {
+		res.setHeader("location", location);
+		res.writeHead(permanent? 301: 302, "redirect!");
+		res.end();
+	}
 
 	let {sessionId, sessionData} = getSession(req.cookies.session);
 	req.sessionId = sessionId;

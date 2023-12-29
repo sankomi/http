@@ -124,6 +124,30 @@ server.get("/stats", (req, res) => {
 	return res.end();
 });
 
+server.get("/lucky", (req, res) => {
+	if (Math.random() > 0.5) {
+		return res.redirect("/win");
+	} else {
+		return res.redirect("/lose");
+	}
+});
+
+server.get("/win", (req, res) => {
+	res.writeHead(200);
+	res.write(say(["you win!"]));
+	res.end();
+});
+
+server.get("/lose", (req, res) => {
+	res.writeHead(200);
+	res.write(say(["you lose!"]));
+	res.end();
+});
+
+server.get("/moved", (req, res) => {
+	res.redirect("/", true);
+});
+
 server.get("/html", async (req, res) => {
 	return res.render("page", {title: "title", content: "content"});
 });
