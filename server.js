@@ -48,6 +48,7 @@ const viewer = new SimpleViewer("views");
 // router object
 
 let router = {
+	paths: [],
 	callbacks: new Map(),
 	get(pathname, callback) {
 		this.setCallback("GET", pathname, callback);
@@ -55,29 +56,65 @@ let router = {
 	post(pathname, callback) {
 		this.setCallback("POST", pathname, callback)
 	},
+	put(pathname, callback) {
+		this.setCallback("DELETE", pathname, callback)
+	},
+	delete(pathname, callback) {
+		this.setCallback("DELETE", pathname, callback)
+	},
 	setCallback(method, pathname, callback) {
-		if (this.callbacks.has(pathname)) {
-			this.callbacks.get(pathname)[method] = callback;
+		let strings = pathname.split("/");
+		let index = this.paths.push(strings) - 1;
+
+		if (this.callbacks.has(index)) {
+			this.callbacks.get(index)[method] = callback;
 		} else {
-			this.callbacks.set(pathname, {[method]: callback});
+			this.callbacks.set(index, {[method]: callback});
 		}
 	},
 	getCallback(pathname, method) {
+		let strings = pathname.split("/");
+		let paths = this.paths;
+		let params = new Map();
+		for (let i = 0; i < strings.length; i++) {
+			paths = paths.filter(path => {
+				if (path.length < i + 1) {
+					return false;
+				}
+
+				let check = path[i];
+				let string = strings[i];
+				if (check.startsWith(":")) {
+					if (!params.has(path)) {
+						params.set(path, {});
+					}
+
+					params.get(path)[check.substring(1)] = string;
+					return true;
+				}
+
+				return check === string;
+			});
+		}
+		let path = paths?.[0];
+		let index = this.paths.indexOf(path);
+		let param = params.get(path);
+
 		let callbacks;
 		if (pathname.endsWith("/")) {
-			callbacks = this.callbacks.get(pathname) || this.callbacks.get(pathname.slice(0, -1));
+			callbacks = this.callbacks.get(index) || this.callbacks.get(index.slice(0, -1));
 		} else {
-			callbacks = this.callbacks.get(pathname) || this.callbacks.get(pathname + "/");
+			callbacks = this.callbacks.get(index) || this.callbacks.get(index + "/");
 		}
 		if (!callbacks) {
-			return {code: 404, callback: null};
+			return {code: 404, callback: null, param: null};
 		}
 
 		let callback = callbacks[method];
 		if (callback) {
-			return {code: 200, callback};
+			return {code: 200, callback, param};
 		} else {
-			return {code: 405, callback: null};
+			return {code: 405, callback: null, param: null};
 		}
 	},
 };
@@ -172,8 +209,9 @@ server.on("request", async (req, res) => {
 	req.session = sessionData;
 	res.setHeader("set-cookie", `session=${sessionId};max-age=3600`);
 
-	let {code, callback} = router.getCallback(pathname, req.method);
+	let {code, callback, param} = router.getCallback(pathname, req.method);
 	if (code === 200) {
+		req.param = param;
 		return callback(req, res);
 	}
 
@@ -193,12 +231,12 @@ server.on("request", async (req, res) => {
 	}
 
 	if (code === 404) {
-		res.writeHead(404, "no dragons here", {"content-type": "text/plain"});
-		res.write("404 no dragons here");
+		res.writeHead(404, "nothing here", {"content-type": "text/plain"});
+		res.write("404 nothing here");
 		return res.end();
 	} else if (code === 405) {
 		res.writeHead(405, "method not allowed", {"content-type": "text/plain"});
-		res.write("405 dragons here but method not allowed");
+		res.write("405 method not allowed");
 		return res.end();
 	}
 });

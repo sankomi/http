@@ -124,6 +124,16 @@ server.get("/stats", (req, res) => {
 	return res.end();
 });
 
+server.get("/mimic/:as/:quote", (req, res) => {
+	let as = req.param.as;
+	let quote = req.param.quote;
+
+	res.setHeader("content-type", "text/plain");
+	res.writeHead(200);
+	res.write(say([quote], as));
+	res.end();
+});
+
 server.get("/lucky", (req, res) => {
 	if (Math.random() > 0.5) {
 		return res.redirect("/win");
@@ -155,15 +165,15 @@ server.get("/html", async (req, res) => {
 
 // utility functions
 
-function say(messages) {
-	let write = messages.map(string => `dragon: ${string}`).join("\n");
+function say(messages, as = "dragon") {
+	let write = messages.map(string => `${as}: ${string}`).join("\n");
 	return "dragons!\n\n" + write;
 }
 
-function sayData(messages) {
+function sayData(messages, as = "dragon") {
 	return {
 		title: "dragons!",
-		content: messages.map(string => `dragon: ${string}`).join("\n"),
+		content: messages.map(string => `${as}: ${string}`).join("\n"),
 	};
 }
 
