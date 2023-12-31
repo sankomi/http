@@ -10,6 +10,25 @@ let presentsReceived = 0;
 
 // set routes
 
+let router = server.Router();
+router.get("/", (req, res) => {
+	res.setHeader("content-type", "text/plain");
+	res.writeHead(200);
+	res.write(say(["router!"]));
+	res.end();
+});
+
+let anotherRouter = server.Router();
+anotherRouter.get("/", (req, res) => {
+	res.setHeader("content-type", "text/plain");
+	res.writeHead(200);
+	res.write(say(["another router!"]));
+	res.end();
+});
+
+router.use("/another", anotherRouter);
+server.use("/router", router);
+
 server.get("/", (req, res) => {
 	let viewCount = req.session.viewCount || 0;
 	req.session.viewCount = ++viewCount;

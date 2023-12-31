@@ -47,22 +47,48 @@ const viewer = new SimpleViewer("views");
 
 // router object
 
-let router = {
-	paths: [],
-	callbacks: new Map(),
+class Router {
+
+	constructor() {
+		this.paths = [];
+		this.callbacks = new Map();
+	}
+
+	trimSlashes(pathname) {
+		pathname = pathname.replace(/^\//, "");
+		pathname = pathname.replace(/\/$/, "");
+		return pathname;
+	}
+
+	use(pathname, router) {
+		pathname = this.trimSlashes(pathname);
+		router.paths = router.paths.map(path => {
+			return [...pathname.split("/"), ...path.filter(s => s !== "")];
+		});
+		router.paths.forEach((path, i) => {
+			let index = this.paths.push(path) - 1;
+			this.callbacks.set(index, router.callbacks.get(i));
+		});
+	}
+
 	get(pathname, callback) {
 		this.setCallback("GET", pathname, callback);
-	},
+	}
+
 	post(pathname, callback) {
 		this.setCallback("POST", pathname, callback)
-	},
+	}
+
 	put(pathname, callback) {
 		this.setCallback("DELETE", pathname, callback)
-	},
+	}
+
 	delete(pathname, callback) {
 		this.setCallback("DELETE", pathname, callback)
-	},
+	}
+
 	setCallback(method, pathname, callback) {
+		pathname = this.trimSlashes(pathname);
 		let strings = pathname.split("/");
 		let index = this.paths.push(strings) - 1;
 
@@ -71,17 +97,15 @@ let router = {
 		} else {
 			this.callbacks.set(index, {[method]: callback});
 		}
-	},
+	}
+
 	getCallback(pathname, method) {
+		pathname = this.trimSlashes(pathname);
 		let strings = pathname.split("/");
-		let paths = this.paths;
+		let paths = this.paths.filter(path => path.length === strings.length);
 		let params = new Map();
 		for (let i = 0; i < strings.length; i++) {
 			paths = paths.filter(path => {
-				if (path.length < i + 1) {
-					return false;
-				}
-
 				let check = path[i];
 				let string = strings[i];
 				if (check.startsWith(":")) {
@@ -100,12 +124,7 @@ let router = {
 		let index = this.paths.indexOf(path);
 		let param = params.get(path);
 
-		let callbacks;
-		if (pathname.endsWith("/")) {
-			callbacks = this.callbacks.get(index) || this.callbacks.get(index.slice(0, -1));
-		} else {
-			callbacks = this.callbacks.get(index) || this.callbacks.get(index + "/");
-		}
+		let callbacks = this.callbacks.get(index);
 		if (!callbacks) {
 			return {code: 404, callback: null, param: null};
 		}
@@ -116,8 +135,11 @@ let router = {
 		} else {
 			return {code: 405, callback: null, param: null};
 		}
-	},
-};
+	}
+
+}
+
+let router = new Router();
 
 
 // static files
@@ -268,7 +290,11 @@ function parseCookie(cookie) {
 
 // export
 module.exports = {
+	use: router.use.bind(router),
 	get: router.get.bind(router),
 	post: router.post.bind(router),
+	put: router.put.bind(router),
+	delete: router.delete.bind(router),
 	listen: server.listen.bind(server),
+	Router: () => new Router(),
 };
