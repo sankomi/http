@@ -29,10 +29,15 @@ anotherRouter.get("/", (req, res) => {
 router.use("/another", anotherRouter);
 server.use("/router", router);
 
-server.get("/", (req, res) => {
-	let viewCount = req.session.viewCount || 0;
-	req.session.viewCount = ++viewCount;
+server.use("/", (req, res, next) => {
+	if (req.method === "GET") {
+		let viewCount = req.session.viewCount || 0;
+		req.session.viewCount = ++viewCount;
+	}
+	next();
+});
 
+server.get("/", (req, res) => {
 	res.setHeader("content-type", "text/plain");
 	res.statusCode = 200;
 

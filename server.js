@@ -52,6 +52,8 @@ class Router {
 	constructor() {
 		this.paths = [];
 		this.callbacks = new Map();
+		this.middlePaths = [];
+		this.middlewares = new Map();
 	}
 
 	trimSlashes(pathname) {
@@ -60,15 +62,22 @@ class Router {
 		return pathname;
 	}
 
-	use(pathname, router) {
+	use(pathname, usable) {
 		pathname = this.trimSlashes(pathname);
-		router.paths = router.paths.map(path => {
-			return [...pathname.split("/"), ...path.filter(s => s !== "")];
-		});
-		router.paths.forEach((path, i) => {
-			let index = this.paths.push(path) - 1;
-			this.callbacks.set(index, router.callbacks.get(i));
-		});
+
+		if (usable instanceof Router) {
+			usable.paths = usable.paths.map(path => {
+				return [...pathname.split("/"), ...path.filter(s => s !== "")];
+			});
+			usable.paths.forEach((path, i) => {
+				let index = this.paths.push(path) - 1;
+				this.callbacks.set(index, usable.callbacks.get(i));
+			});
+		} else if (typeof usable === "function") {
+			let path = pathname.split("/");
+			let index = this.middlePaths.push(path) - 1;
+			this.middlewares.set(index, usable);
+		}
 	}
 
 	get(pathname, callback) {
@@ -99,9 +108,33 @@ class Router {
 		}
 	}
 
+	getMiddleware(pathname) {
+		pathname = this.trimSlashes(pathname);
+		let strings = pathname.split("/");
+
+		let paths = this.middlePaths.filter(path => path.length === strings.length);
+		for (let i = 0; i < strings.length; i++) {
+			paths = paths.filter(path => {
+				let check = path[i];
+				let string = strings[i];
+				if (check.startsWith(":")) {
+					return true;
+				}
+
+				return check === string;
+			});
+		}
+		let path = paths?.[0];
+		let index = this.middlePaths.indexOf(path);
+
+		let middleware = this.middlewares.get(index);
+		return middleware || null;
+	}
+
 	getCallback(pathname, method) {
 		pathname = this.trimSlashes(pathname);
 		let strings = pathname.split("/");
+
 		let paths = this.paths.filter(path => path.length === strings.length);
 		let params = new Map();
 		for (let i = 0; i < strings.length; i++) {
@@ -234,7 +267,13 @@ server.on("request", async (req, res) => {
 	let {code, callback, param} = router.getCallback(pathname, req.method);
 	if (code === 200) {
 		req.param = param;
-		return callback(req, res);
+
+		let middleware = router.getMiddleware(pathname);
+		if (middleware) {
+			middleware(req, res, () => res.writableEnded || callback(req, res));
+		} else {
+			return callback(req, res);
+		}
 	}
 
 	if (req.method === "GET") {
