@@ -195,6 +195,12 @@ server.get("/html", async (req, res) => {
 	return res.render("page", {title: "title", content: "content"});
 });
 
+server.get("/star*star*star", (req, res) => {
+	res.writeHead(200);
+	res.write(say(["* star * star * star *"]));
+	res.end();
+});
+
 
 // utility functions
 
