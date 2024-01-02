@@ -17,6 +17,7 @@ router.get("/", (req, res) => {
 	res.write(say(["router!"]));
 	res.end();
 });
+router.use("/", routerCounter);
 
 let anotherRouter = server.Router();
 anotherRouter.get("/", (req, res) => {
@@ -25,6 +26,13 @@ anotherRouter.get("/", (req, res) => {
 	res.write(say(["another router!"]));
 	res.end();
 });
+anotherRouter.use("/", routerCounter);
+
+function routerCounter(req, res, next) {
+	let routerCount = req.session.routerCount || 0;
+	req.session.routerCount = ++routerCount;
+	next();
+}
 
 router.use("/another", anotherRouter);
 server.use("/router", router);
@@ -122,7 +130,8 @@ server.post("/", (req, res) => {
 
 server.get("/stats", (req, res) => {
 	let viewCount = req.session.viewCount || 0;
-	let data = {cookiesGiven, presentsReceived, viewCount};
+	let routerCount = req.session.routerCount || 0;
+	let data = {cookiesGiven, presentsReceived, viewCount, routerCount};
 	let contentType = null;
 	let body = null;
 

@@ -66,12 +66,20 @@ class Router {
 		pathname = this.trimSlashes(pathname);
 
 		if (usable instanceof Router) {
-			usable.paths = usable.paths.map(path => {
+			let paths = usable.paths.map(path => {
 				return [...pathname.split("/"), ...path.filter(s => s !== "")];
 			});
-			usable.paths.forEach((path, i) => {
+			paths.forEach((path, i) => {
 				let index = this.paths.push(path) - 1;
 				this.callbacks.set(index, usable.callbacks.get(i));
+			});
+
+			let middlePaths = usable.middlePaths.map(path => {
+				return [...pathname.split("/"), ...path.filter(s => s !== "")];
+			});
+			middlePaths.forEach((path, i) => {
+				let index = this.middlePaths.push(path) - 1;
+				this.middlewares.set(index, usable.middlewares.get(i));
 			});
 		} else if (typeof usable === "function") {
 			let path = pathname.split("/");
