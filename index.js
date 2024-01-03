@@ -19,6 +19,12 @@ router.get("/", (req, res) => {
 });
 router.use("/", routerCounter);
 
+router.get("*", (req, res) => {
+	res.writeHead(200);
+	res.write(say(["* router star *"]));
+	res.end();
+});
+
 let anotherRouter = server.Router();
 anotherRouter.get("/", (req, res) => {
 	res.setHeader("content-type", "text/plain");
@@ -191,14 +197,20 @@ server.get("/moved", (req, res) => {
 	res.redirect("/", true);
 });
 
-server.get("/html", async (req, res) => {
-	return res.render("page", {title: "title", content: "content"});
-});
-
 server.get("/star*star*star", (req, res) => {
 	res.writeHead(200);
 	res.write(say(["* star * star * star *"]));
 	res.end();
+});
+
+server.get("*", async (req, res) => {
+	res.writeHead(200);
+	res.write(say(["* star *"]));
+	res.end();
+});
+
+server.get("/html", async (req, res) => {
+	return res.render("page", {title: "title", content: "content"});
 });
 
 

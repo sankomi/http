@@ -54,8 +54,6 @@ class Router {
 		this.callbacks = new Map();
 		this.middlePaths = [];
 		this.middlewares = new Map();
-		this.starPaths = [];
-		this.starCallbacks = new Map();
 	}
 
 	trimSlashes(pathname) {
@@ -69,7 +67,11 @@ class Router {
 
 		if (usable instanceof Router) {
 			let paths = usable.paths.map(path => {
-				return [...pathname.split("/"), ...path.filter(s => s !== "")];
+				if (Array.isArray(path)) {
+					return [...pathname.split("/"), ...path.filter(s => s !== "")];
+				} else if (path.includes("*")) {
+					return pathname + "/" + path;
+				}
 			});
 			paths.forEach((path, i) => {
 				let index = this.paths.push(path) - 1;
@@ -109,12 +111,12 @@ class Router {
 	setCallback(method, pathname, callback) {
 		pathname = this.trimSlashes(pathname);
 		if (pathname.includes("*")) {
-			let index = this.starPaths.push(pathname) - 1;
+			let index = this.paths.push(pathname) - 1;
 
-			if (this.starCallbacks.has(index)) {
-				this.starCallbacks.get(index)[method] = callback;
+			if (this.callbacks.has(index)) {
+				this.callbacks.get(index)[method] = callback;
 			} else {
-				this.starCallbacks.set(index, {[method]: callback});
+				this.callbacks.set(index, {[method]: callback});
 			}
 
 			return;
@@ -139,9 +141,7 @@ class Router {
 			paths = paths.filter(path => {
 				let check = path[i];
 				let string = strings[i];
-				if (check.startsWith(":")) {
-					return true;
-				}
+				if (check.startsWith(":")) return true;
 
 				return check === string;
 			});
@@ -156,14 +156,19 @@ class Router {
 	getCallback(pathname, method) {
 		pathname = this.trimSlashes(pathname);
 
-		let starPaths = this.starPaths.filter(path => {
+		let starPaths = this.paths.filter(path => typeof path === "string" && path.includes("*"));
+		starPaths = starPaths.filter(path => {
 			let strings = path.split("*").filter(s => s !== "");
 
-			if (!pathname.startsWith(strings[0])) {
+			if (strings.length === 0) {
+				return true;
+			} else if (!pathname.startsWith(strings[0])) {
 				return false;
+			} else if (strings.length === 1) {
+				return true;
 			} else if (!pathname.endsWith(strings[strings.length - 1])) {
 				return false;
-			} else if (strings.length <= 2) {
+			} else if (strings.length === 2) {
 				return true;
 			}
 
@@ -175,19 +180,9 @@ class Router {
 
 			return true;
 		});
-		let starPath = starPaths?.[0];
-		let starIndex = this.starPaths.indexOf(starPath);
-		let starCallbacks = this.starCallbacks.get(starIndex);
-		if (starCallbacks) {
-			let starCallback = starCallbacks[method];
-			if (starCallback) {
-				return {code: 200, callback: starCallback, param: null};
-			}
-		}
 
 		let strings = pathname.split("/");
-
-		let paths = this.paths.filter(path => path.length === strings.length);
+		let paths = this.paths.filter(path => Array.isArray(path) && path.length === strings.length);
 		let params = new Map();
 		for (let i = 0; i < strings.length; i++) {
 			paths = paths.filter(path => {
@@ -205,20 +200,28 @@ class Router {
 				return check === string;
 			});
 		}
-		let path = paths?.[0];
-		let index = this.paths.indexOf(path);
-		let param = params.get(path);
 
-		let callbacks = this.callbacks.get(index);
-		if (!callbacks) {
-			return {code: 404, callback: null, param: null};
+		let indexs = [...starPaths, ...paths].map(path => this.paths.indexOf(path));
+		let code = 404;
+		for (let i = 0; i < this.paths.length; i++) {
+			if (!indexs.includes(i)) continue;
+
+			let callbacks = this.callbacks.get(i);
+			if (!callbacks) continue;
+
+			let callback = callbacks[method];
+			if (!callback) {
+				code = 405;
+				continue;
+			}
+
+			return {code: 200, callback, param: params.get(this.paths[i])};
 		}
 
-		let callback = callbacks[method];
-		if (callback) {
-			return {code: 200, callback, param};
-		} else {
+		if (code === 405) {
 			return {code: 405, callback: null, param: null};
+		} else {
+			return {code: 404, callback: null, param: null};
 		}
 	}
 
